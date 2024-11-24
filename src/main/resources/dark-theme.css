@@ -1,0 +1,23 @@
+/* dark-theme.css */
+.root {
+    -fx-background-color: #1e1e1e;
+    -fx-text-fill: #ffffff;
+}
+
+.label, .button, .text-field, .table-view {
+    -fx-background-color: #2d2d2d;
+    -fx-text-fill: #ffffff;
+}
+
+.table-view {
+    -fx-control-inner-background: #2d2d2d;
+}
+
+.table-row-cell {
+    -fx-background-color: #2d2d2d;
+}
+
+.table-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #ffffff;
+}

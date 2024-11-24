@@ -1,6 +1,5 @@
 package org.vstar.lab4.ui;
 
-// MainApp.java
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -11,8 +10,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
-
-import org.vstar.lab4.data_consuming.BatchProcessor;
+import org.vstar.lab4.data_consuming.ThreadProcessor;
 import org.vstar.lab4.data_preprocessing.BatchSplitter;
 import org.vstar.lab4.data_preprocessing.CsvReader;
 
@@ -24,16 +22,46 @@ public class MTGuiApplication extends Application {
     private TextField threadCountField;
     private TextField batchSizeField;
     private Button startButton;
+    private static TextArea logArea = new TextArea();
 
     private ExecutorService executorService;
-    private List<BatchProcessor> processors = new ArrayList<>();
-    private ObservableList<BatchInfo> batchInfos = FXCollections.observableArrayList();
+    private List<ThreadProcessor> processors = new ArrayList<>();
+    private ObservableList<ThreadInfo> threadInfos = FXCollections.observableArrayList();
+    private ObservableList<RunHistory> runHistories = FXCollections.observableArrayList();
+
+    private boolean isDarkTheme = false;
+
+    public static void appendLog(String message) {
+        logArea.appendText(message + "\n");
+    }
 
     @Override
     public void start(Stage primaryStage) {
         primaryStage.setTitle("Багатопотокова обробка даних");
 
-        // Створюємо інтерфейс
+        TabPane tabPane = new TabPane();
+
+        Tab mainTab = new Tab("Головна");
+        mainTab.setContent(createMainTabContent());
+        mainTab.setClosable(false);
+
+        Tab historyTab = new Tab("Історія запусків");
+        historyTab.setContent(createHistoryTabContent());
+        historyTab.setClosable(false);
+
+        Tab logTab = new Tab("Логи");
+        logTab.setContent(createLogTabContent());
+        logTab.setClosable(false);
+
+        tabPane.getTabs().addAll(mainTab, historyTab, logTab);
+
+        Scene scene = new Scene(tabPane, 800, 600);
+        scene.getStylesheets().add("style.css");
+        primaryStage.setScene(scene);
+        primaryStage.show();
+    }
+
+    private VBox createMainTabContent() {
         VBox root = new VBox(10);
         root.setPadding(new Insets(10));
 
@@ -47,54 +75,96 @@ public class MTGuiApplication extends Application {
                 startButton
         );
 
-        TableView<BatchInfo> table = createTableView();
+        Button themeButton = new Button("Перемкнути тему");
+        themeButton.setOnAction(e -> toggleTheme(root.getScene()));
 
-        root.getChildren().addAll(controls, table);
+        TableView<ThreadInfo> table = createTableView();
+
+        root.getChildren().addAll(controls, themeButton, table);
 
         startButton.setOnAction(e -> startProcessing(table));
 
-        Scene scene = new Scene(root, 800, 600);
-        primaryStage.setScene(scene);
-        primaryStage.show();
+        return root;
     }
 
-    private TableView<BatchInfo> createTableView() {
-        TableView<BatchInfo> table = new TableView<>();
-        table.setItems(batchInfos);
+    private VBox createHistoryTabContent() {
+        TableView<RunHistory> historyTable = new TableView<>();
+        historyTable.setItems(runHistories);
 
-        TableColumn<BatchInfo, Number> batchNumberCol = new TableColumn<>("Батч №");
-        batchNumberCol.setCellValueFactory(data -> data.getValue().batchNumberProperty());
+        TableColumn<RunHistory, Number> runNumberCol = new TableColumn<>("Запуск №");
+        runNumberCol.setCellValueFactory(data -> data.getValue().runNumberProperty());
 
-        TableColumn<BatchInfo, Number> threadNumberCol = new TableColumn<>("Потік №");
-        threadNumberCol.setCellValueFactory(data -> data.getValue().threadNumberProperty());
+        TableColumn<RunHistory, Number> threadCountCol = new TableColumn<>("Кількість потоків");
+        threadCountCol.setCellValueFactory(data -> data.getValue().threadCountProperty());
 
-        TableColumn<BatchInfo, String> statusCol = new TableColumn<>("Стан");
+        TableColumn<RunHistory, Number> batchSizeCol = new TableColumn<>("Розмір батчу");
+        batchSizeCol.setCellValueFactory(data -> data.getValue().batchSizeProperty());
+
+        TableColumn<RunHistory, String> speedModeCol = new TableColumn<>("Режим швидкості");
+        speedModeCol.setCellValueFactory(data -> data.getValue().speedModeProperty());
+
+        TableColumn<RunHistory, Number> executionTimeCol = new TableColumn<>("Час виконання (мс)");
+        executionTimeCol.setCellValueFactory(data -> data.getValue().executionTimeProperty());
+
+        historyTable.getColumns().addAll(runNumberCol, threadCountCol, batchSizeCol, speedModeCol, executionTimeCol);
+
+        VBox vbox = new VBox(historyTable);
+        return vbox;
+    }
+
+    private VBox createLogTabContent() {
+        logArea.setEditable(false);
+        VBox vbox = new VBox(logArea);
+        return vbox;
+    }
+
+    private TableView<ThreadInfo> createTableView() {
+        TableView<ThreadInfo> table = new TableView<>();
+        table.setItems(threadInfos);
+
+        TableColumn<ThreadInfo, Number> threadIdCol = new TableColumn<>("Потік №");
+        threadIdCol.setCellValueFactory(data -> data.getValue().threadIdProperty());
+
+        TableColumn<ThreadInfo, String> statusCol = new TableColumn<>("Стан");
         statusCol.setCellValueFactory(data -> data.getValue().statusProperty());
 
-        TableColumn<BatchInfo, Number> currentRowCol = new TableColumn<>("Поточний рядок");
-        currentRowCol.setCellValueFactory(data -> data.getValue().currentRowProperty());
+        TableColumn<ThreadInfo, Number> currentRowIdCol = new TableColumn<>("Поточний ID рядка");
+        currentRowIdCol.setCellValueFactory(data -> data.getValue().currentRowIdProperty());
 
-        TableColumn<BatchInfo, Void> actionCol = new TableColumn<>("Дії");
+        TableColumn<ThreadInfo, String> idRangeCol = new TableColumn<>("Діапазон ID рядків");
+        idRangeCol.setCellValueFactory(data -> data.getValue().idRangeProperty());
+
+        TableColumn<ThreadInfo, String> speedModeCol = new TableColumn<>("Режим швидкості");
+        speedModeCol.setCellValueFactory(data -> data.getValue().speedModeProperty());
+
+        TableColumn<ThreadInfo, Void> actionCol = new TableColumn<>("Дії");
         actionCol.setCellFactory(param -> new TableCell<>() {
             private final Button pauseButton = new Button("Пауза");
             private final Button resumeButton = new Button("Відновити");
             private final Button terminateButton = new Button("Завершити");
-            private final HBox pane = new HBox(5, pauseButton, resumeButton, terminateButton);
+            private final ChoiceBox<String> speedChoiceBox = new ChoiceBox<>(FXCollections.observableArrayList("Швидкий", "Середній", "Повільний"));
+            private final HBox pane = new HBox(5, pauseButton, resumeButton, terminateButton, speedChoiceBox);
 
             {
                 pauseButton.setOnAction(e -> {
-                    BatchInfo batchInfo = getTableView().getItems().get(getIndex());
-                    batchInfo.getProcessor().pause();
+                    ThreadInfo threadInfo = getTableView().getItems().get(getIndex());
+                    threadInfo.getProcessor().pause();
                 });
 
                 resumeButton.setOnAction(e -> {
-                    BatchInfo batchInfo = getTableView().getItems().get(getIndex());
-                    batchInfo.getProcessor().resume();
+                    ThreadInfo threadInfo = getTableView().getItems().get(getIndex());
+                    threadInfo.getProcessor().resume();
                 });
 
                 terminateButton.setOnAction(e -> {
-                    BatchInfo batchInfo = getTableView().getItems().get(getIndex());
-                    batchInfo.getProcessor().terminate();
+                    ThreadInfo threadInfo = getTableView().getItems().get(getIndex());
+                    threadInfo.getProcessor().terminate();
+                });
+
+                speedChoiceBox.setOnAction(e -> {
+                    String selectedMode = speedChoiceBox.getValue();
+                    ThreadInfo threadInfo = getTableView().getItems().get(getIndex());
+                    threadInfo.getProcessor().setSpeedMode(selectedMode);
                 });
             }
 
@@ -109,11 +179,11 @@ public class MTGuiApplication extends Application {
             }
         });
 
-        table.getColumns().addAll(batchNumberCol, threadNumberCol, statusCol, currentRowCol, actionCol);
+        table.getColumns().addAll(threadIdCol, statusCol, currentRowIdCol, idRangeCol, speedModeCol, actionCol);
         return table;
     }
 
-    private void startProcessing(TableView<BatchInfo> table) {
+    private void startProcessing(TableView<ThreadInfo> table) {
         int threadCount;
         int batchSize;
 
@@ -126,50 +196,63 @@ public class MTGuiApplication extends Application {
         }
 
         startButton.setDisable(true);
-        batchInfos.clear();
+        threadInfos.clear();
         processors.clear();
 
-        // Читаємо дані
-        Task<List<String[]>> loadDataTask = new Task<>() {
+        Task<Void> processingTask = new Task<>() {
             @Override
-            protected List<String[]> call() throws Exception {
-                return CsvReader.readCsv(CsvReader.filePath);
+            protected Void call() throws Exception {
+                // Завантаження даних
+                List<String[]> data = CsvReader.readCsv(CsvReader.filePath);
+
+                // Розбиваємо дані на батчі
+                List<List<String[]>> batches = BatchSplitter.splitIntoBatches(data, batchSize);
+
+                // Створюємо пул потоків
+                executorService = Executors.newFixedThreadPool(threadCount);
+
+                int startId = 1;
+
+                long startTime = System.currentTimeMillis();
+
+                for (int i = 0; i < threadCount; i++) {
+                    List<String[]> batchData = batches.get(i % batches.size());
+                    int endId = startId + batchData.size() - 1;
+                    ThreadProcessor processor = new ThreadProcessor(batchData, i + 1, startId, endId);
+                    processors.add(processor);
+
+                    ThreadInfo threadInfo = new ThreadInfo(processor);
+                    Platform.runLater(() -> threadInfos.add(threadInfo));
+
+                    executorService.submit(processor);
+
+                    startId = endId + 1;
+                }
+
+                // Чекаємо завершення всіх потоків
+                executorService.shutdown();
+                while (!executorService.isTerminated()) {
+                    Thread.sleep(100);
+                }
+
+                long endTime = System.currentTimeMillis();
+                long executionTime = endTime - startTime;
+
+                // Визначаємо поточний режим швидкості (якщо режими змінювалися, можна відобразити перший)
+                String speedMode = processors.get(0).speedModeProperty().get();
+
+                // Додаємо запис до історії запусків
+                int runNumber = runHistories.size() + 1;
+                RunHistory history = new RunHistory(runNumber, threadCount, batchSize, speedMode, executionTime);
+                Platform.runLater(() -> runHistories.add(history));
+
+                Platform.runLater(() -> startButton.setDisable(false));
+
+                return null;
             }
         };
 
-        loadDataTask.setOnSucceeded(e -> {
-            List<String[]> data = loadDataTask.getValue();
-
-            // Розбиваємо на батчі
-            List<List<String[]>> batches = BatchSplitter.splitIntoBatches(data, batchSize);
-
-            // Створюємо пул потоків
-            executorService = Executors.newFixedThreadPool(threadCount);
-
-            int threadNumber = 1;
-
-            for (int i = 0; i < batches.size(); i++) {
-                List<String[]> batch = batches.get(i);
-                BatchProcessor processor = new BatchProcessor(batch, i + 1, threadNumber);
-                processors.add(processor);
-
-                BatchInfo batchInfo = new BatchInfo(processor);
-                batchInfos.add(batchInfo);
-
-                executorService.submit(processor);
-
-                threadNumber = (threadNumber % threadCount) + 1;
-            }
-
-            startButton.setDisable(false);
-        });
-
-        loadDataTask.setOnFailed(e -> {
-            showAlert("Помилка", "Не вдалося завантажити дані.");
-            startButton.setDisable(false);
-        });
-
-        new Thread(loadDataTask).start();
+        new Thread(processingTask).start();
     }
 
     private void showAlert(String title, String message) {
@@ -178,6 +261,18 @@ public class MTGuiApplication extends Application {
             alert.setTitle(title);
             alert.showAndWait();
         });
+    }
+
+    private void toggleTheme(Scene scene) {
+        if (isDarkTheme) {
+            scene.getStylesheets().remove("dark-theme.css");
+            scene.getStylesheets().add("style.css");
+            isDarkTheme = false;
+        } else {
+            scene.getStylesheets().remove("style.css");
+            scene.getStylesheets().add("dark-theme.css");
+            isDarkTheme = true;
+        }
     }
 
     @Override

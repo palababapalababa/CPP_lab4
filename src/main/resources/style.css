@@ -1,0 +1,32 @@
+/* style.css */
+.root {
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #000000;
+}
+
+.label {
+    -fx-font-size: 14px;
+}
+
+.button {
+    -fx-background-color: #e0e0e0;
+    -fx-text-fill: #000000;
+}
+
+.text-field {
+    -fx-background-color: #f0f0f0;
+    -fx-text-fill: #000000;
+}
+
+.table-view {
+    -fx-control-inner-background: #ffffff;
+}
+
+.table-row-cell {
+    -fx-background-color: #ffffff;
+}
+
+.table-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #000000;
+}
