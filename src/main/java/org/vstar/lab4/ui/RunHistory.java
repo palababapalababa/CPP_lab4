@@ -2,6 +2,9 @@ package org.vstar.lab4.ui;
 
 import javafx.beans.property.*;
 
+/**
+ * Клас, що представляє запис в історії запусків.
+ */
 public class RunHistory {
     private final IntegerProperty runNumber;
     private final IntegerProperty threadCount;

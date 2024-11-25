@@ -8,10 +8,19 @@ import java.io.Reader;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Утилітний клас для читання CSV-файлів.
+ */
 public class CsvReader {
 
     public static final String filePath = "C:\\пз\\пз 3 курс\\кпп\\лаб4\\MultiThreadMLModel\\src\\main\\resources\\RandomData.csv";
 
+
+    /**
+     * Читає CSV-файл та повертає список масивів рядків.
+     *
+     * @return Список масивів рядків з CSV-файлу.
+     */
     public static List<String[]> readCsv(String filePath) {
         List<String[]> rows = new ArrayList<>();
         try (Reader reader = new FileReader(filePath)) {

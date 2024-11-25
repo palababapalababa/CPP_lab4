@@ -1,102 +1,133 @@
 package org.vstar.lab4.data_consuming;
 
-// ThreadProcessor.java
 import javafx.application.Platform;
 import javafx.beans.property.*;
+import org.vstar.lab4.ui.MTGuiApplication;
 
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
 
 public class ThreadProcessor implements Runnable {
-    private final List<String[]> data;
     private final int threadId;
-    private final int startId;
-    private final int endId;
+    private final BlockingQueue<List<String[]>> batchQueue;
 
     private volatile boolean paused = false;
     private volatile boolean terminated = false;
 
     private final StringProperty statusProperty = new SimpleStringProperty("Очікує");
     private final IntegerProperty currentRowIdProperty = new SimpleIntegerProperty(0);
-    private final StringProperty speedModeProperty = new SimpleStringProperty("Середній");
+    private final StringProperty currentBatchRangeProperty = new SimpleStringProperty("");
 
-    private volatile int sleepTime = 20; // Початково середній режим (20 мс)
+    private final IntegerProperty globalSleepTimeProperty;
 
-    public ThreadProcessor(List<String[]> data, int threadId, int startId, int endId) {
-        this.data = data;
+    // Поля для діапазону рядків поточного батчу
+    private int currentBatchStartId;
+    private int currentBatchEndId;
+
+    public ThreadProcessor(int threadId, BlockingQueue<List<String[]>> batchQueue, IntegerProperty globalSleepTimeProperty) {
         this.threadId = threadId;
-        this.startId = startId;
-        this.endId = endId;
+        this.batchQueue = batchQueue;
+        this.globalSleepTimeProperty = globalSleepTimeProperty;
     }
 
     @Override
     public void run() {
         updateStatus("Виконується");
-        for (int i = 0; i < data.size(); i++) {
+        try {
+            while (!terminated) {
+                synchronized (this) {
+                    while (paused && !terminated) {
+                        updateStatus("Призупинено");
+                        wait();
+                    }
+                    if (terminated) {
+                        break;
+                    }
+                }
+
+                List<String[]> batch = batchQueue.poll();
+                if (batch == null) {
+                    // Немає більше батчів для обробки
+                    break;
+                }
+
+                // Встановлюємо діапазон рядків батчу
+                currentBatchStartId = Integer.parseInt(batch.get(0)[0]);
+                currentBatchEndId = Integer.parseInt(batch.get(batch.size() - 1)[0]);
+                updateCurrentBatchRange(currentBatchStartId + " - " + currentBatchEndId);
+
+                // Обробка батчу
+                processBatch(batch);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        updateStatus("Завершено");
+    }
+
+    private void processBatch(List<String[]> batch) {
+        int sleepTime = globalSleepTimeProperty.get();
+        for (String[] row : batch) {
             if (terminated) {
-                updateStatus("Завершено");
                 break;
             }
 
             synchronized (this) {
-                while (paused) {
+                while (paused && !terminated) {
                     updateStatus("Призупинено");
                     try {
                         wait();
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
-                        return;
                     }
+                }
+                if (terminated) {
+                    break;
                 }
             }
 
-            String[] row = data.get(i);
-            processRow(row);
+            // Обробка рядка
+            try {
+                Thread.sleep(sleepTime);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
 
-            int currentRowId = startId + i;
-            updateCurrentRowId(currentRowId);
+            int rowId = Integer.parseInt(row[0]);
+            updateCurrentRowId(rowId);
+
+            // Перевіряємо, чи змінився sleepTime
+            sleepTime = globalSleepTimeProperty.get();
         }
 
-        if (!terminated) {
-            updateStatus("Завершено");
-        }
+        // Логування завершення батчу з діапазоном рядків
+        log("Потік " + threadId + " обробив батч з рядками " + currentBatchStartId + " - " + currentBatchEndId);
     }
 
-    private void processRow(String[] row) {
-        // Обробка рядка (можна додати реальну логіку)
-        try {
-            Thread.sleep(sleepTime); // Час обробки залежить від обраного режиму
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+    private void log(String message) {
+        Platform.runLater(() -> {
+            MTGuiApplication.appendLog(message);
+        });
     }
 
-    // Методи для управління потоком
     public void pause() {
         paused = true;
+        log("Потік " + threadId + " призупинено.");
     }
 
     public synchronized void resume() {
         paused = false;
         notify();
+        log("Потік " + threadId + " відновлено.");
     }
 
     public void terminate() {
         terminated = true;
-    }
-
-    public void setSpeedMode(String mode) {
-        switch (mode) {
-            case "Швидкий":
-                sleepTime = 1;
-                break;
-            case "Середній":
-                sleepTime = 20;
-                break;
-            case "Повільний":
-                sleepTime = 100;
-                break;
+        synchronized (this) {
+            notify();
         }
-        Platform.runLater(() -> speedModeProperty.set(mode));
+        log("Потік " + threadId + " завершено.");
     }
 
     // Властивості для GUI
@@ -108,28 +139,23 @@ public class ThreadProcessor implements Runnable {
         return currentRowIdProperty;
     }
 
-    public StringProperty speedModeProperty() {
-        return speedModeProperty;
+    public StringProperty currentBatchRangeProperty() {
+        return currentBatchRangeProperty;
     }
 
     public int getThreadId() {
         return threadId;
     }
 
-    public int getStartId() {
-        return startId;
-    }
-
-    public int getEndId() {
-        return endId;
-    }
-
-    // Допоміжні методи для оновлення GUI
     private void updateStatus(String status) {
         Platform.runLater(() -> statusProperty.set(status));
     }
 
     private void updateCurrentRowId(int rowId) {
         Platform.runLater(() -> currentRowIdProperty.set(rowId));
+    }
+
+    private void updateCurrentBatchRange(String range) {
+        Platform.runLater(() -> currentBatchRangeProperty.set(range));
     }
 }

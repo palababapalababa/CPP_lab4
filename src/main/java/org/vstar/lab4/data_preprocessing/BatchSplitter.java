@@ -3,7 +3,18 @@ package org.vstar.lab4.data_preprocessing;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Утилітний клас для розбиття даних на батчі.
+ */
 public class BatchSplitter {
+
+    /**
+     * Розбиває дані на батчі заданого розміру.
+     *
+     * @param data      Дані для розбиття.
+     * @param batchSize Розмір кожного батчу.
+     * @return Список батчів, де кожен батч — це список масивів рядків.
+     */
     public static List<List<String[]>> splitIntoBatches(List<String[]> data, int batchSize) {
         List<List<String[]>> batches = new ArrayList<>();
         int totalRows = data.size();

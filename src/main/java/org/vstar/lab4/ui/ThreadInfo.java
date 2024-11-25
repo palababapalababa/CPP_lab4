@@ -1,6 +1,5 @@
 package org.vstar.lab4.ui;
 
-// ThreadInfo.java
 import javafx.beans.property.*;
 import org.vstar.lab4.data_consuming.ThreadProcessor;
 
@@ -8,8 +7,7 @@ public class ThreadInfo {
     private final IntegerProperty threadId;
     private final StringProperty status;
     private final IntegerProperty currentRowId;
-    private final StringProperty speedMode;
-    private final StringProperty idRange;
+    private final StringProperty currentBatchRange;
 
     private final ThreadProcessor processor;
 
@@ -18,8 +16,7 @@ public class ThreadInfo {
         this.threadId = new SimpleIntegerProperty(processor.getThreadId());
         this.status = processor.statusProperty();
         this.currentRowId = processor.currentRowIdProperty();
-        this.speedMode = processor.speedModeProperty();
-        this.idRange = new SimpleStringProperty(processor.getStartId() + " - " + processor.getEndId());
+        this.currentBatchRange = processor.currentBatchRangeProperty();
     }
 
     public IntegerProperty threadIdProperty() {
@@ -34,12 +31,8 @@ public class ThreadInfo {
         return currentRowId;
     }
 
-    public StringProperty speedModeProperty() {
-        return speedMode;
-    }
-
-    public StringProperty idRangeProperty() {
-        return idRange;
+    public StringProperty currentBatchRangeProperty() {
+        return currentBatchRange;
     }
 
     public ThreadProcessor getProcessor() {

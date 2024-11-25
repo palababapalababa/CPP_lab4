@@ -4,20 +4,106 @@
     -fx-text-fill: #ffffff;
 }
 
-.label, .button, .text-field, .table-view {
+.label {
+    -fx-font-size: 14px;
+    -fx-text-fill: #ffffff;
+}
+
+.button {
     -fx-background-color: #2d2d2d;
     -fx-text-fill: #ffffff;
 }
 
+/* Загальний стиль таблиць */
 .table-view {
-    -fx-control-inner-background: #2d2d2d;
+    -fx-control-inner-background: #1e1e1e;
+    -fx-table-header-border-color: transparent;
 }
 
-.table-row-cell {
+.table-view .column-header {
+    -fx-background-color: #2d2d2d;
+    -fx-text-fill: #ffffff;
+    -fx-font-weight: bold;
+    -fx-alignment: CENTER;
+}
+
+.table-view .column-header-background {
     -fx-background-color: #2d2d2d;
 }
 
-.table-cell {
+.table-view .table-row-cell {
+    -fx-background-color: #1e1e1e;
+}
+
+.table-view .table-cell {
     -fx-background-color: transparent;
     -fx-text-fill: #ffffff;
+}
+
+/* Вибраний рядок таблиці */
+.table-view .table-row-cell:selected {
+    -fx-background-color: #333333;
+}
+
+/* Загальний стиль для текстових полів */
+.text-field {
+    -fx-background-color: #2d2d2d;
+    -fx-text-fill: #ffffff;
+}
+
+
+.text-area {
+    -fx-control-inner-background: #2d2d2d;
+    -fx-text-fill: #ffffff;
+}
+
+/* Заголовки вкладок (TabPane) */
+.tab-pane .tab-header-background {
+    -fx-background-color: #2d2d2d;
+}
+
+.tab-pane .tab {
+    -fx-background-color: #1e1e1e;
+    -fx-text-fill: #ffffff;
+    -fx-font-weight: bold;
+    -fx-padding: 5 10 5 10;
+}
+
+.tab-pane .tab:hover {
+    -fx-background-color: #333333;
+    -fx-text-fill: #ffffff; /* Задаємо колір тексту при наведенні */
+}
+
+.tab-pane .tab:selected {
+    -fx-background-color: #444444;
+    -fx-text-fill: #ffffff; /* Задаємо колір тексту для активної вкладки */
+    -fx-font-weight: bold;
+}
+
+.tab-pane .tab-label {
+    -fx-text-fill: inherit; /* Наслідує колір тексту вкладки */
+}
+/* Основний стиль для ChoiceBox */
+.choice-box {
+    -fx-background-color: #2d2d2d; /* Темне тло */
+    -fx-text-fill: #ffffff;       /* Білий текст */
+    -fx-border-radius: 10;       /* Заокруглення меж */
+    -fx-background-radius: 10;  /* Заокруглення тла */
+}
+
+/* Випадаючий список */
+.choice-box-popup {
+    -fx-background-color: #3a3a3a; /* Темне тло випадаючого списку */
+    -fx-border-color: #444444;     /* Межа */
+    -fx-border-radius: 10;         /* Заокруглення меж */
+}
+
+/* Елементи списку */
+.choice-box-popup .list-view .list-cell {
+    -fx-background-color: #3a3a3a; /* Темне тло елементів */
+    -fx-text-fill: #ffffff;        /* Білий текст */
+}
+
+.choice-box-popup .list-view .list-cell:hover {
+    -fx-background-color: #555555; /* Зміна тла при наведенні */
 }
