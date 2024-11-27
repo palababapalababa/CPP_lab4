@@ -3,7 +3,9 @@ package org.vstar.lab4.ui;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.LongProperty;
 import javafx.beans.property.SimpleIntegerProperty;
+import javafx.beans.property.SimpleLongProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
@@ -11,18 +13,14 @@ import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
-import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.*;
-import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import org.vstar.lab4.data_consuming.ThreadProcessor;
 import org.vstar.lab4.data_preprocessing.BatchSplitter;
 import org.vstar.lab4.data_preprocessing.CsvReader;
 
-import java.io.File;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.*;
 
 public class MTGuiApplication extends Application {
@@ -55,6 +53,9 @@ public class MTGuiApplication extends Application {
     // Позиція для перетягування вікна
     private double xOffset = 0;
     private double yOffset = 0;
+
+    // Глобальна модель
+    private LongProperty globalModelVowelCount = new SimpleLongProperty(0);
 
     public static void appendLog(String message) {
         logArea.appendText(message + "\n");
@@ -148,7 +149,6 @@ public class MTGuiApplication extends Application {
         // Контролери
         HBox controls = new HBox(10);
 
-
         threadCountField = new TextField("4");
         batchSizeField = new TextField("1000");
         startButton = new Button("Почати обробку");
@@ -180,7 +180,11 @@ public class MTGuiApplication extends Application {
         TableView<ThreadInfo> table = createTableView();
         VBox.setVgrow(table, Priority.ALWAYS);
 
-        root.getChildren().addAll(controls, themeButton, table);
+        // Відображення глобальної моделі
+        Label globalModelLabel = new Label();
+        globalModelLabel.textProperty().bind(globalModelVowelCount.asString("Поточне значення моделі (кількість голосних): %d"));
+
+        root.getChildren().addAll(controls, themeButton, globalModelLabel, table);
 
         startButton.setOnAction(e -> startProcessing());
 
@@ -240,11 +244,11 @@ public class MTGuiApplication extends Application {
 
         TableColumn<ThreadInfo, Number> threadIdCol = new TableColumn<>("Потік №");
         threadIdCol.setCellValueFactory(new PropertyValueFactory<>("threadId"));
-        threadIdCol.prefWidthProperty().bind(table.widthProperty().multiply(0.1));
+        threadIdCol.prefWidthProperty().bind(table.widthProperty().multiply(0.08));
 
         TableColumn<ThreadInfo, String> statusCol = new TableColumn<>("Стан");
         statusCol.setCellValueFactory(new PropertyValueFactory<>("status"));
-        statusCol.prefWidthProperty().bind(table.widthProperty().multiply(0.15));
+        statusCol.prefWidthProperty().bind(table.widthProperty().multiply(0.12));
 
         TableColumn<ThreadInfo, Number> currentRowIdCol = new TableColumn<>("Поточний ID рядка");
         currentRowIdCol.setCellValueFactory(new PropertyValueFactory<>("currentRowId"));
@@ -254,8 +258,12 @@ public class MTGuiApplication extends Application {
         batchRangeCol.setCellValueFactory(new PropertyValueFactory<>("currentBatchRange"));
         batchRangeCol.prefWidthProperty().bind(table.widthProperty().multiply(0.2));
 
+        TableColumn<ThreadInfo, Number> batchVowelCountCol = new TableColumn<>("Кількість голосних (батч)");
+        batchVowelCountCol.setCellValueFactory(new PropertyValueFactory<>("batchVowelCount"));
+        batchVowelCountCol.prefWidthProperty().bind(table.widthProperty().multiply(0.15));
+
         TableColumn<ThreadInfo, Void> actionCol = new TableColumn<>("Дії");
-        actionCol.prefWidthProperty().bind(table.widthProperty().multiply(0.4));
+        actionCol.prefWidthProperty().bind(table.widthProperty().multiply(0.3));
         actionCol.setCellFactory(param -> new TableCell<>() {
             private final Button pauseButton = new Button("Пауза");
             private final Button resumeButton = new Button("Відновити");
@@ -290,7 +298,7 @@ public class MTGuiApplication extends Application {
             }
         });
 
-        table.getColumns().addAll(threadIdCol, statusCol, currentRowIdCol, batchRangeCol, actionCol);
+        table.getColumns().addAll(threadIdCol, statusCol, currentRowIdCol, batchRangeCol, batchVowelCountCol, actionCol);
 
         return table;
     }
@@ -309,6 +317,7 @@ public class MTGuiApplication extends Application {
 
         startButton.setDisable(true);
         threadInfos.clear();
+        globalModelVowelCount.set(0);
 
         Task<Void> processingTask = new Task<>() {
             @Override
@@ -333,18 +342,27 @@ public class MTGuiApplication extends Application {
                 long startTime = System.currentTimeMillis();
 
                 // Запускаємо потоки
+                List<Future<Integer>> futures = new ArrayList<>();
+
                 for (int i = 0; i < threadCount; i++) {
                     ThreadProcessor processor = new ThreadProcessor(i + 1, batchQueue, globalSleepTimeProperty);
 
                     ThreadInfo threadInfo = new ThreadInfo(processor);
                     Platform.runLater(() -> threadInfos.add(threadInfo));
 
-                    executorService.submit(processor);
+                    Future<Integer> future = executorService.submit(processor);
+                    futures.add(future);
                 }
 
-                // Чекаємо завершення потоків
-                executorService.shutdown();
-                executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+                // Агрегація результатів
+                for (Future<Integer> future : futures) {
+                    try {
+                        int result = future.get();
+                        Platform.runLater(() -> globalModelVowelCount.set(globalModelVowelCount.get() + result));
+                    } catch (InterruptedException | ExecutionException e) {
+                        e.printStackTrace();
+                    }
+                }
 
                 long endTime = System.currentTimeMillis();
                 long executionTime = endTime - startTime;

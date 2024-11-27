@@ -6,8 +6,9 @@ import org.vstar.lab4.ui.MTGuiApplication;
 
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Callable;
 
-public class ThreadProcessor implements Runnable {
+public class ThreadProcessor implements Callable<Integer> {
     private final int threadId;
     private final BlockingQueue<List<String[]>> batchQueue;
 
@@ -17,6 +18,7 @@ public class ThreadProcessor implements Runnable {
     private final StringProperty statusProperty = new SimpleStringProperty("Очікує");
     private final IntegerProperty currentRowIdProperty = new SimpleIntegerProperty(0);
     private final StringProperty currentBatchRangeProperty = new SimpleStringProperty("");
+    private final IntegerProperty batchVowelCountProperty = new SimpleIntegerProperty(0);
 
     private final IntegerProperty globalSleepTimeProperty;
 
@@ -31,8 +33,9 @@ public class ThreadProcessor implements Runnable {
     }
 
     @Override
-    public void run() {
+    public Integer call() {
         updateStatus("Виконується");
+        int totalVowelCount = 0;
         try {
             while (!terminated) {
                 synchronized (this) {
@@ -57,17 +60,25 @@ public class ThreadProcessor implements Runnable {
                 updateCurrentBatchRange(currentBatchStartId + " - " + currentBatchEndId);
 
                 // Обробка батчу
-                processBatch(batch);
+                int batchVowelCount = processBatch(batch);
+                totalVowelCount += batchVowelCount;
+
+                // Оновлюємо кількість голосних для поточного батчу
+                updateBatchVowelCount(batchVowelCount);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
 
         updateStatus("Завершено");
+
+        // Повертаємо загальну кількість голосних, підрахованих потоком
+        return totalVowelCount;
     }
 
-    private void processBatch(List<String[]> batch) {
+    private int processBatch(List<String[]> batch) {
         int sleepTime = globalSleepTimeProperty.get();
+        int batchVowelCount = 0;
         for (String[] row : batch) {
             if (terminated) {
                 break;
@@ -97,12 +108,29 @@ public class ThreadProcessor implements Runnable {
             int rowId = Integer.parseInt(row[0]);
             updateCurrentRowId(rowId);
 
+            // Підраховуємо кількість голосних у імені та прізвищі
+            int vowelCount = countVowels(row[1]) + countVowels(row[2]);
+            batchVowelCount += vowelCount;
+
             // Перевіряємо, чи змінився sleepTime
             sleepTime = globalSleepTimeProperty.get();
         }
 
         // Логування завершення батчу з діапазоном рядків
-        log("Потік " + threadId + " обробив батч з рядками " + currentBatchStartId + " - " + currentBatchEndId);
+        log("Потік " + threadId + " обробив батч з рядками " + currentBatchStartId + " - " + currentBatchEndId + ". Кількість голосних: " + batchVowelCount);
+
+        return batchVowelCount;
+    }
+
+    private int countVowels(String text) {
+        int count = 0;
+        text = text.toLowerCase();
+        for (char c : text.toCharArray()) {
+            if ("aeiouyаеєиіїоуюя".indexOf(c) != -1) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private void log(String message) {
@@ -143,6 +171,10 @@ public class ThreadProcessor implements Runnable {
         return currentBatchRangeProperty;
     }
 
+    public IntegerProperty batchVowelCountProperty() {
+        return batchVowelCountProperty;
+    }
+
     public int getThreadId() {
         return threadId;
     }
@@ -157,5 +189,9 @@ public class ThreadProcessor implements Runnable {
 
     private void updateCurrentBatchRange(String range) {
         Platform.runLater(() -> currentBatchRangeProperty.set(range));
+    }
+
+    private void updateBatchVowelCount(int count) {
+        Platform.runLater(() -> batchVowelCountProperty.set(count));
     }
 }

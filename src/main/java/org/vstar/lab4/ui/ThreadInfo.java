@@ -8,6 +8,7 @@ public class ThreadInfo {
     private final StringProperty status;
     private final IntegerProperty currentRowId;
     private final StringProperty currentBatchRange;
+    private final IntegerProperty batchVowelCount;
 
     private final ThreadProcessor processor;
 
@@ -17,6 +18,7 @@ public class ThreadInfo {
         this.status = processor.statusProperty();
         this.currentRowId = processor.currentRowIdProperty();
         this.currentBatchRange = processor.currentBatchRangeProperty();
+        this.batchVowelCount = processor.batchVowelCountProperty();
     }
 
     public IntegerProperty threadIdProperty() {
@@ -33,6 +35,10 @@ public class ThreadInfo {
 
     public StringProperty currentBatchRangeProperty() {
         return currentBatchRange;
+    }
+
+    public IntegerProperty batchVowelCountProperty() {
+        return batchVowelCount;
     }
 
     public ThreadProcessor getProcessor() {
