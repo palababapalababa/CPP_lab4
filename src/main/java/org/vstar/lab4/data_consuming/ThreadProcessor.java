@@ -7,7 +7,12 @@ import org.vstar.lab4.ui.MTGuiApplication;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
+/**
+ * Клас для обробки батчів у потоках.
+ */
 public class ThreadProcessor implements Callable<Integer> {
     private final int threadId;
     private final BlockingQueue<List<String[]>> batchQueue;
@@ -22,14 +27,17 @@ public class ThreadProcessor implements Callable<Integer> {
 
     private final IntegerProperty globalSleepTimeProperty;
 
+    private final Consumer<Integer> batchResultCallback;
+
     // Поля для діапазону рядків поточного батчу
     private int currentBatchStartId;
     private int currentBatchEndId;
 
-    public ThreadProcessor(int threadId, BlockingQueue<List<String[]>> batchQueue, IntegerProperty globalSleepTimeProperty) {
+    public ThreadProcessor(int threadId, BlockingQueue<List<String[]>> batchQueue, IntegerProperty globalSleepTimeProperty, Consumer<Integer> batchResultCallback) {
         this.threadId = threadId;
         this.batchQueue = batchQueue;
         this.globalSleepTimeProperty = globalSleepTimeProperty;
+        this.batchResultCallback = batchResultCallback;
     }
 
     @Override
@@ -48,7 +56,7 @@ public class ThreadProcessor implements Callable<Integer> {
                     }
                 }
 
-                List<String[]> batch = batchQueue.poll();
+                List<String[]> batch = batchQueue.poll(1, TimeUnit.SECONDS);
                 if (batch == null) {
                     // Немає більше батчів для обробки
                     break;
@@ -65,6 +73,9 @@ public class ThreadProcessor implements Callable<Integer> {
 
                 // Оновлюємо кількість голосних для поточного батчу
                 updateBatchVowelCount(batchVowelCount);
+
+                // Оновлюємо глобальну модель
+                batchResultCallback.accept(batchVowelCount);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -91,6 +102,7 @@ public class ThreadProcessor implements Callable<Integer> {
                         wait();
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
+                        return batchVowelCount;
                     }
                 }
                 if (terminated) {
@@ -103,6 +115,7 @@ public class ThreadProcessor implements Callable<Integer> {
                 Thread.sleep(sleepTime);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+                return batchVowelCount;
             }
 
             int rowId = Integer.parseInt(row[0]);

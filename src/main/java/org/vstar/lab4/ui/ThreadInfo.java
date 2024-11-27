@@ -3,6 +3,9 @@ package org.vstar.lab4.ui;
 import javafx.beans.property.*;
 import org.vstar.lab4.data_consuming.ThreadProcessor;
 
+/**
+ * Клас, що представляє інформацію про потік для відображення в таблиці.
+ */
 public class ThreadInfo {
     private final IntegerProperty threadId;
     private final StringProperty status;

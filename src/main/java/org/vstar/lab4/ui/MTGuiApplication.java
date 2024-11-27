@@ -22,6 +22,7 @@ import org.vstar.lab4.data_preprocessing.CsvReader;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Consumer;
 
 public class MTGuiApplication extends Application {
     private TextField threadCountField;
@@ -40,11 +41,7 @@ public class MTGuiApplication extends Application {
 
     // Для керування режимом швидкості
     private String[] speedModes = {"Швидкий", "Середній", "Повільний"};
-    private Map<String, Integer> speedModeMap = Map.of(
-            "Швидкий", 1,
-            "Середній", 20,
-            "Повільний", 100
-    );
+    private ConcurrentHashMap<String, Integer> speedModeMap = new ConcurrentHashMap<>();
     private String currentSpeedMode = "Середній";
 
     // Черга батчів для обробки
@@ -63,6 +60,11 @@ public class MTGuiApplication extends Application {
 
     @Override
     public void start(Stage primaryStage) {
+        // Ініціалізуємо швидкості
+        speedModeMap.put("Швидкий", 1);
+        speedModeMap.put("Середній", 20);
+        speedModeMap.put("Повільний", 100);
+
         primaryStage.setTitle("Багатопотокова обробка даних");
 
         // Видаляємо стандартну заголовкову панель
@@ -114,18 +116,18 @@ public class MTGuiApplication extends Application {
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         // Кнопка мінімізації
-        Button minimizeButton = new Button();
-        minimizeButton.setStyle("-fx-background-color: transparent; -fx-shape: 'M 0 5 A 5 5 0 1 0 10 5 A 5 5 0 1 0 0 5'; -fx-pref-width: 20; -fx-pref-height: 20;");
+        Button minimizeButton = new Button("-");
+        minimizeButton.setStyle("-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 14px; -fx-pref-width: 30; -fx-pref-height: 30;");
         minimizeButton.setOnAction(e -> stage.setIconified(true));
-        minimizeButton.setOnMouseEntered(e -> minimizeButton.setStyle("-fx-background-color: #666666; -fx-shape: 'M 0 5 A 5 5 0 1 0 10 5 A 5 5 0 1 0 0 5';"));
-        minimizeButton.setOnMouseExited(e -> minimizeButton.setStyle("-fx-background-color: transparent; -fx-shape: 'M 0 5 A 5 5 0 1 0 10 5 A 5 5 0 1 0 0 5';"));
+        minimizeButton.setOnMouseEntered(e -> minimizeButton.setStyle("-fx-background-color: #666666; -fx-text-fill: white; -fx-font-size: 14px; -fx-pref-width: 30; -fx-pref-height: 30;"));
+        minimizeButton.setOnMouseExited(e -> minimizeButton.setStyle("-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 14px; -fx-pref-width: 30; -fx-pref-height: 30;"));
 
         // Кнопка закриття
-        Button closeButton = new Button();
-        closeButton.setStyle("-fx-background-color: transparent; -fx-shape: 'M 0 5 A 5 5 0 1 0 10 5 A 5 5 0 1 0 0 5'; -fx-pref-width: 20; -fx-pref-height: 20;");
+        Button closeButton = new Button("X");
+        closeButton.setStyle("-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 14px; -fx-pref-width: 30; -fx-pref-height: 30;");
         closeButton.setOnAction(e -> stage.close());
-        closeButton.setOnMouseEntered(e -> closeButton.setStyle("-fx-background-color: #ff5555; -fx-shape: 'M 0 5 A 5 5 0 1 0 10 5 A 5 5 0 1 0 0 5';"));
-        closeButton.setOnMouseExited(e -> closeButton.setStyle("-fx-background-color: transparent; -fx-shape: 'M 0 5 A 5 5 0 1 0 10 5 A 5 5 0 1 0 0 5';"));
+        closeButton.setOnMouseEntered(e -> closeButton.setStyle("-fx-background-color: #ff5555; -fx-text-fill: white; -fx-font-size: 14px; -fx-pref-width: 30; -fx-pref-height: 30;"));
+        closeButton.setOnMouseExited(e -> closeButton.setStyle("-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 14px; -fx-pref-width: 30; -fx-pref-height: 30;"));
 
         titleBar.getChildren().addAll(icon, title, spacer, minimizeButton, closeButton);
 
@@ -150,7 +152,9 @@ public class MTGuiApplication extends Application {
         HBox controls = new HBox(10);
 
         threadCountField = new TextField("4");
+        threadCountField.setPrefWidth(60);
         batchSizeField = new TextField("1000");
+        batchSizeField.setPrefWidth(80);
         startButton = new Button("Почати обробку");
 
         // ChoiceBox для режиму швидкості
@@ -232,6 +236,8 @@ public class MTGuiApplication extends Application {
         themeButton.setOnAction(e -> toggleTheme(themeButton.getScene()));
 
         logArea.setEditable(false);
+        logArea.setWrapText(true);
+        logArea.setPrefHeight(600);
         VBox vbox = new VBox(10, themeButton, logArea);
         vbox.setPadding(new Insets(10));
         VBox.setVgrow(logArea, Priority.ALWAYS);
@@ -285,6 +291,11 @@ public class MTGuiApplication extends Application {
                     ThreadInfo threadInfo = getTableView().getItems().get(getIndex());
                     threadInfo.getProcessor().terminate();
                 });
+
+                // Стилізація кнопок
+                pauseButton.setStyle("-fx-background-color: #ffa500; -fx-text-fill: white;");
+                resumeButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;");
+                terminateButton.setStyle("-fx-background-color: #ff0000; -fx-text-fill: white;");
             }
 
             @Override
@@ -344,8 +355,15 @@ public class MTGuiApplication extends Application {
                 // Запускаємо потоки
                 List<Future<Integer>> futures = new ArrayList<>();
 
+                // Define a Consumer to handle batch results
+                Consumer<Integer> batchResultCallback = count -> {
+                    Platform.runLater(() -> {
+                        globalModelVowelCount.set(globalModelVowelCount.get() + count);
+                    });
+                };
+
                 for (int i = 0; i < threadCount; i++) {
-                    ThreadProcessor processor = new ThreadProcessor(i + 1, batchQueue, globalSleepTimeProperty);
+                    ThreadProcessor processor = new ThreadProcessor(i + 1, batchQueue, globalSleepTimeProperty, batchResultCallback);
 
                     ThreadInfo threadInfo = new ThreadInfo(processor);
                     Platform.runLater(() -> threadInfos.add(threadInfo));
@@ -358,7 +376,9 @@ public class MTGuiApplication extends Application {
                 for (Future<Integer> future : futures) {
                     try {
                         int result = future.get();
-                        Platform.runLater(() -> globalModelVowelCount.set(globalModelVowelCount.get() + result));
+                        // The global count is already updated via the callback
+                        // But if needed, we can add here as well
+                        // Platform.runLater(() -> globalModelVowelCount.set(globalModelVowelCount.get() + result));
                     } catch (InterruptedException | ExecutionException e) {
                         e.printStackTrace();
                     }
@@ -403,7 +423,7 @@ public class MTGuiApplication extends Application {
 
     @Override
     public void stop() throws Exception {
-        if (executorService != null) {
+        if (executorService != null && !executorService.isShutdown()) {
             executorService.shutdownNow();
         }
         super.stop();
